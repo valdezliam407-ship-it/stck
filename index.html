@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Control de stock</title>
+  <style>
+    body{font-family:Inter, sans-serif; margin:0; padding:24px; background:#f2f2f2; color:#111}
+    .container{max-width:800px; margin:0 auto; background:white; padding:20px; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,.08)}
+    h1{margin:0 0 10px; font-size:22px; color:#111}
+    p{color:#555}
+
+    table{width:100%; border-collapse:collapse; margin-top:18px}
+    th,td{padding:10px; border-bottom:1px solid #e5e5e5; text-align:left}
+    th{background:#fafafa; color:#111; font-weight:600}
+    input[type=text], input[type=number]{padding:6px 8px; border:1px solid #ccc; border-radius:6px; width:100%; background:#fff}
+
+    button{padding:7px 10px; border-radius:6px; border:0; cursor:pointer; font-size:14px}
+    .btn-black{background:#111; color:#fff}
+    .btn-delete{background:#d33; color:white}
+
+    .add-box{margin-top:18px; padding:15px; background:#fafafa; border-radius:8px}
+    .row{display:flex; gap:12px; margin-bottom:10px}
+    .row > div{flex:1}
+    .muted{color:#666; font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Control de stock</h1>
+    <p>Gestiona tus prendas con guardado en la nube (Netlify + Neon).</p>
+
+    <div class="add-box">
+      <h3 style="margin-top:0; color:#111">Agregar prenda</h3>
+      <div class="row">
+        <div>
+          <label>Nombre</label>
+          <input id="new-name" type="text" placeholder="Ej: Remera negra" />
+        </div>
+        <div>
+          <label>Talle</label>
+          <input id="new-size" type="text" placeholder="Ej: S/M/L" />
+        </div>
+        <div>
+          <label>Stock</label>
+          <input id="new-stock" type="number" min="0" value="0" />
+        </div>
+      </div>
+      <button class="btn-black" id="add-item">Agregar a la lista</button>
+    </div>
+
+    <table id="stock-table">
+      <thead>
+        <tr>
+          <th>Prenda</th>
+          <th>Talle</th>
+          <th>Stock</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <p class="muted">Datos almacenados en servidor.</p>
+  </div>
+
+  <script>
+    async function fetchItems() {
+      const res = await fetch('/.netlify/functions/getItems');
+      return await res.json();
+    }
+
+    async function addItem(name, size, stock) {
+      await fetch('/.netlify/functions/addItem', {
+        method: 'POST',
+        body: JSON.stringify({ name, size, stock })
+      });
+    }
+
+    async function updateItem(id, stock) {
+      await fetch('/.netlify/functions/updateItem', {
+        method: 'POST',
+        body: JSON.stringify({ id, stock })
+      });
+    }
+
+    async function deleteItem(id) {
+      await fetch('/.netlify/functions/deleteItem', {
+        method: 'POST',
+        body: JSON.stringify({ id })
+      });
+    }
+
+    async function render() {
+      const items = await fetchItems();
+      const tbody = document.querySelector('#stock-table tbody');
+      tbody.innerHTML = '';
+
+      items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.name}</td>
+          <td>${item.size}</td>
+          <td><input type="number" min="0" value="${item.stock}" data-id="${item.id}" class="stock-input" /></td>
+          <td><button class="btn-delete" data-del="${item.id}">Eliminar</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('add-item').addEventListener('click', async () => {
+      const name = document.getElementById('new-name').value.trim();
+      const size = document.getElementById('new-size').value.trim();
+      const stock = parseInt(document.getElementById('new-stock').value) || 0;
+
+      if (!name) return alert('Escribe un nombre.');
+
+      await addItem(name, size, stock);
+      render();
+
+      document.getElementById('new-name').value = '';
+      document.getElementById('new-size').value = '';
+      document.getElementById('new-stock').value = 0;
+    });
+
+    document.addEventListener('input', async (e) => {
+      if (e.target.classList.contains('stock-input')) {
+        const id = e.target.dataset.id;
+        const stock = parseInt(e.target.value) || 0;
+        await updateItem(id, stock);
+      }
+    });
+
+    document.addEventListener('click', async (e) => {
+      if (e.target.dataset.del) {
+        const id = e.target.dataset.del;
+        if (confirm('¿Eliminar esta prenda?')) {
+          await deleteItem(id);
+          render();
+        }
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
